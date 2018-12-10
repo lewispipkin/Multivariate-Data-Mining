@@ -1,0 +1,197 @@
+Post 2 - Multivariate Data Mining - Heirarchical Clustering of NBA players
+================
+Lewis Pipkin
+December 10, 2018
+
+Today I am going to exhibit heirarchical clustering to show distinct groups of NBA players. While players can be divided into positions by their height, stature, and skill set, there are other naturally diverging groups based on a number of statistical factors and a little je ne sais quoi. Heirarchical clustering can show us things that back up what we may have already thought about the data, or give us insights into how two or more observations in the dataset are similar or different when we may have thought the opposite. Without any further ado, let's get into it.
+
+``` r
+NBA <- read.csv("~/NBAfull2018.csv",stringsAsFactors = F)[,-1]
+rownames(NBA) <- NBA$Player
+NBA.q <- NBA %>% select(-c(Position,Salary,Player))
+NBA.q <- data.frame(apply(NBA.q, 2, scale))
+
+
+d <- dist(NBA.q, method = "euclidean") # distance matrix
+fit <- hclust(d, method="ward.D")
+plot(fit)
+```
+
+![](Post2_files/figure-markdown_github/heirarchical%20clustering-1.png)
+
+We can go several different routes with this, but I'd prefer to keep the number of clusters manageable, so we'll go with 5 clusters.
+
+``` r
+plot(fit);rect.hclust(fit, k=5, border="red")
+```
+
+![](Post2_files/figure-markdown_github/unnamed-chunk-1-1.png)
+
+``` r
+groups <- cutree(fit, k=5)
+NBA.q <- data.frame(NBA.q,Salary=NBA$Salary,cluster=factor(groups))
+NBA.q$Player <- rownames(NBA)
+NBA.pca <- prcomp(NBA.q[,-c(ncol(NBA.q),ncol(NBA.q)-1,ncol(NBA.q)-2)], center = TRUE,scale. = TRUE)
+ggbiplot(NBA.pca,ellipse=TRUE, obs.scale = 1, var.scale = 1,var.axes=F,labels=NBA.q$Player, groups=factor(NBA.q$cluster))
+```
+
+![](Post2_files/figure-markdown_github/unnamed-chunk-1-2.png) From some of the names on the outskirts of the clusters, we can see kind of what each cluster holds, but in the morass that contains the majority of the players in this dataset, it is impossible to see who is in each cluster regardless of what color their name is. In addition, all of the clusters seem to have different sizes:
+
+``` r
+NBA.q %>% group_by(cluster) %>% tally()
+```
+
+    ## # A tibble: 5 x 2
+    ##   cluster     n
+    ##   <fct>   <int>
+    ## 1 1          94
+    ## 2 2         126
+    ## 3 3          68
+    ## 4 4          32
+    ## 5 5          93
+
+As we can see, the clusters all have different sizes. I will show 9 of the players in each cluster just to get a good look at the types of players, along with some basic statistics.
+
+``` r
+NBA.q.cl1 <- NBA.q %>% filter(cluster==1)
+```
+
+    ## Warning: package 'bindrcpp' was built under R version 3.4.4
+
+``` r
+NBA.q.cl2 <- NBA.q %>% filter(cluster==2)
+NBA.q.cl3 <- NBA.q %>% filter(cluster==3)
+NBA.q.cl4 <- NBA.q %>% filter(cluster==4)
+NBA.q.cl5 <- NBA.q %>% filter(cluster==5)
+NBA.q.cl6 <- NBA.q %>% filter(cluster==6)
+
+sample_func <- function(df){
+  d <<- c()
+  set.seed(50)
+  ind <- sample(1:nrow(df),9,replace=F)
+  d <<- df[ind,"Player"]
+  return(d)
+}
+```
+
+**Cluster 1**
+
+``` r
+sample_func(NBA.q.cl1)
+```
+
+    ## [1] "Raul Neto"         "Justin Jackson"    "Doug McDermott"   
+    ## [4] "Ron Baker"         "Luke Babbitt"      "Alex Abrines"     
+    ## [7] "Patrick Patterson" "Nik Stauskas"      "Troy Daniels"
+
+``` r
+NBA[which(NBA$Player %in% NBA.q.cl1$Player),] %>% summarize(pts=median(PPG),
+                                                            rbs=median(TRB),
+                                                            ast=median(AST),
+                                                            stl=median(STL),
+                                                            blk=median(BLK),
+                                                            minutes=median(MP)/median(GP))
+```
+
+    ##    pts  rbs ast stl blk  minutes
+    ## 1 4.35 1.95 0.8 0.4 0.2 12.91509
+
+Cluster 1 is the guys who don't play much, whether that's from there being a veteran on their team that fulfills the same role (shooter, rebounder, hustle guy on defense, etc.), or they just aren't very good (looking at you, Doug McDermott). 12 minutes per game is only 1 total quarter of playing time, so these are guys that don't see the court and thus do not record many stats or have a huge positive impact on the team's success. (To be blunt, the scrubs.)
+
+**Cluster 2**
+
+``` r
+sample_func(NBA.q.cl2)
+```
+
+    ## [1] "Nikola Vucevic"  "Jeff Green"      "Dejounte Murray" "Paul George"    
+    ## [5] "Julius Randle"   "Austin Rivers"   "Markieff Morris" "Lonzo Ball"     
+    ## [9] "Andrew Wiggins"
+
+``` r
+NBA[which(NBA$Player %in% NBA.q.cl2$Player),] %>% summarize(pts=median(PPG),
+                                                            rbs=median(TRB),
+                                                            ast=median(AST),
+                                                            stl=median(STL),
+                                                            blk=median(BLK),
+                                                            minutes=median(MP)/median(GP))
+```
+
+    ##   pts  rbs ast stl blk  minutes
+    ## 1  13 4.65 2.5 0.9 0.4 27.69863
+
+This is kind of a funny mix of passable young players (Andrew Wiggins, Lonzo Ball) and older, better players (Paul George, Nikola Vucevic). These players spend a lot of time on the court, score the ball, and contribute in other ways as well, which we can tell by the good rebounding and assist numbers. This cluster could be considered guys who are the 3rd/maybe 2nd options on their team.
+
+**Cluster 3**
+
+``` r
+sample_func(NBA.q.cl3)
+```
+
+    ## [1] "Michael Kidd-Gilchrist" "Jakob Poeltl"          
+    ## [3] "Cristiano Felicio"      "Mike Scott"            
+    ## [5] "Jerami Grant"           "Amir Johnson"          
+    ## [7] "Larry Nance"            "Kevon Looney"          
+    ## [9] "Tristan Thompson"
+
+``` r
+NBA[which(NBA$Player %in% NBA.q.cl3$Player),] %>% summarize(pts=median(PPG),
+                                                            rbs=median(TRB),
+                                                            ast=median(AST),
+                                                            stl=median(STL),
+                                                            blk=median(BLK),
+                                                            minutes=median(MP)/median(GP))
+```
+
+    ##    pts  rbs ast stl blk  minutes
+    ## 1 5.75 4.25 0.8 0.4 0.6 15.27642
+
+This cluster contains players who come in and are good for a couple of baskets, but they contribute by playing defense (second highest blocks per game) and rebounding. This group could be considered the good young role players and/or hustle guys: names like Larry Nance, Jakob Poeltl, and Tristan Thompson clue us in to that.
+
+**Cluster 4**
+
+``` r
+sample_func(NBA.q.cl4)
+```
+
+    ## [1] "Kyrie Irving"       "James Harden"       "DeMar DeRozan"     
+    ## [4] "Taj Gibson"         "Jimmy Butler"       "Anthony Davis"     
+    ## [7] "Karl-Anthony Towns" "Jonas Valanciunas"  "Nikola Jokic"
+
+``` r
+NBA[which(NBA$Player %in% NBA.q.cl4$Player),] %>% summarize(pts=median(PPG),
+                                                            rbs=median(TRB),
+                                                            ast=median(AST),
+                                                            stl=median(STL),
+                                                            blk=median(BLK),
+                                                            minutes=median(MP)/median(GP))
+```
+
+    ##    pts rbs ast stl blk  minutes
+    ## 1 21.7 8.8   4 1.1 0.9 32.70667
+
+Members of cluster 4 are in large part the superstars, which includes having high records in most statistical categories, we see players like Kyrie Irving, James Harden, Karl-Anthony Towns and Anthony Davis, who finish in the upper echelon of mid-season or end-of-season rewards such as MVP voting or the All-Star teams. These players tend to be on the court the most, and their teams are often constructed to complement and accentuate their skill set.
+
+**Cluster 5**
+
+``` r
+sample_func(NBA.q.cl5)
+```
+
+    ## [1] "Mike Muscala"        "James Ennis"         "Delon Wright"       
+    ## [4] "OG Anunoby"          "Jerian Grant"        "Avery Bradley"      
+    ## [7] "Matthew Dellavedova" "Luc Mbah a Moute"    "Tyler Ulis"
+
+``` r
+NBA[which(NBA$Player %in% NBA.q.cl5$Player),] %>% summarize(pts=median(PPG),
+                                                            rbs=median(TRB),
+                                                            ast=median(AST),
+                                                            stl=median(STL),
+                                                            blk=median(BLK),
+                                                            minutes=median(MP)/median(GP))
+```
+
+    ##   pts rbs ast stl blk  minutes
+    ## 1 7.9 2.5 2.2 0.7 0.2 18.82258
+
+This final cluster, while not only comprised of this type of player, looks to be composed of a lot of the type of player called "3-and-D": players who are on the court to stand in the corner and shoot 3-pointers, and on the other end, play lockdown defense. Because they exert most of their energy on the defensive end, their role on offense is simpler, but still vitally important. They tend not to handle the ball much, but find ways to get space from their defender and receive passes for open shots. There tend to be several of this type of player on each team, so each one does not play a whole lot or record massive statistics every game.
